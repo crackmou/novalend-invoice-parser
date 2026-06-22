@@ -26,6 +26,7 @@ class ParseInvoicesCommand extends Command
     {
         $this->parser->parse('data/invoices.json');
         $this->parser->parse('data/invoices.csv');
+        $this->parser->parse('data/invoices_1000k.csv');
         return Command::SUCCESS;
     }
 }

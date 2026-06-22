@@ -11,6 +11,12 @@ use App\Repository\InvoiceRepository;
 
 class InvoiceParser
 {
+    /**
+     * Nombre de factures accumulées avant d'envoyer un lot au repository, afin de
+     * ne jamais garder l'intégralité du fichier en mémoire.
+     */
+    private const FLUSH_SIZE = 1000;
+
     private InvoiceRepository $invoiceRepository;
 
     public function __construct(InvoiceRepository $invoiceRepository)
@@ -32,33 +38,63 @@ class InvoiceParser
         $content = file_get_contents($filePath);
         $invoices = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
 
+        $batch = [];
         foreach ($invoices as $invoice) {
-            $this->invoiceRepository->upsert(
-                (string) $invoice['id_externe'],
-                (string) $invoice['nom'],
-                (float) $invoice['montant'],
-                Currency::from((string) $invoice['devise']),
-                (string) $invoice['partenaire'],
-            );
+            $batch[] = [
+                'idExternal' => (string) $invoice['id_externe'],
+                'name' => (string) $invoice['nom'],
+                'amount' => (float) $invoice['montant'],
+                'currency' => Currency::from((string) $invoice['devise']),
+                'partnerName' => (string) $invoice['partenaire'],
+            ];
+
+            if (count($batch) >= self::FLUSH_SIZE) {
+                $this->invoiceRepository->upsertBatch($batch);
+                $batch = [];
+            }
+        }
+
+        if ($batch !== []) {
+            $this->invoiceRepository->upsertBatch($batch);
         }
     }
 
     private function parseCsv(string $filePath): void
     {
-        $rows = array_map(
-            static fn (string $row) => str_getcsv($row, "\t", '"', ''),
-            file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
-        );
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            throw new \RuntimeException(sprintf('Impossible d\'ouvrir le fichier : "%s".', $filePath));
+        }
 
-        // Colonnes du CSV : id_externe, montant, devise, nom, partenaire, date
-        foreach ($rows as $row) {
-            $this->invoiceRepository->upsert(
-                (string) $row[0],
-                (string) $row[3],
-                (float) $row[1],
-                Currency::from((string) $row[2]),
-                (string) $row[4],
-            );
+        try {
+            $batch = [];
+
+            // Colonnes du CSV : id_externe, montant, devise, nom, partenaire, date
+            while (($row = fgetcsv($handle, 0, "\t", '"', '')) !== false) {
+                // Ignore les lignes vides éventuelles.
+                if ($row === [null] || $row === []) {
+                    continue;
+                }
+
+                $batch[] = [
+                    'idExternal' => (string) $row[0],
+                    'name' => (string) $row[3],
+                    'amount' => (float) $row[1],
+                    'currency' => Currency::from((string) $row[2]),
+                    'partnerName' => (string) $row[4],
+                ];
+
+                if (count($batch) >= self::FLUSH_SIZE) {
+                    $this->invoiceRepository->upsertBatch($batch);
+                    $batch = [];
+                }
+            }
+
+            if ($batch !== []) {
+                $this->invoiceRepository->upsertBatch($batch);
+            }
+        } finally {
+            fclose($handle);
         }
     }
 }
