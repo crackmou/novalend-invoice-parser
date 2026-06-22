@@ -4,42 +4,29 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Repository\InvoiceRepository;
 use App\Service\InvoiceParser;
-use Doctrine\DBAL\Connection;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 class InvoiceParserTest extends KernelTestCase
 {
-    private $entityManager;
-
     public function testParseJson(): void
     {
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $invoiceRepository = $this->createMock(InvoiceRepository::class);
+        $invoiceRepository->expects($this->exactly(10))->method('upsert');
 
-        $connection = $this->createMock(Connection::class);
-        $this->entityManager->method('getConnection')->willReturn($connection);
-
-        $connection->expects($this->exactly(10))->method('executeStatement');
-
-        $invoiceParser = new InvoiceParser($this->entityManager);
+        $invoiceParser = new InvoiceParser($invoiceRepository);
 
         $invoiceParser->parse('data/invoices.json');
     }
 
     public function testParseCsv(): void
     {
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
+        $invoiceRepository = $this->createMock(InvoiceRepository::class);
+        $invoiceRepository->expects($this->exactly(10))->method('upsert');
 
-        $connection = $this->createMock(Connection::class);
-        $this->entityManager->method('getConnection')->willReturn($connection);
-
-        $connection->expects($this->exactly(10))->method('executeStatement');
-
-        $invoiceParser = new InvoiceParser($this->entityManager);
+        $invoiceParser = new InvoiceParser($invoiceRepository);
 
         $invoiceParser->parse('data/invoices.csv');
     }
-
 }
-
