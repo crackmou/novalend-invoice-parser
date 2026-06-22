@@ -1,62 +1,82 @@
 [
   {
+    "id_externe": "FAKE-INV-0001",
     "montant": 670.43,
     "devise": "EUR",
     "nom": "Frank Green",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0002",
     "montant": 852.38,
     "devise": "EUR",
     "nom": "John Doe",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0003",
     "montant": 135.87,
     "devise": "USD",
     "nom": "Jane Smith",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0004",
     "montant": 572.52,
     "devise": "JPY",
     "nom": "Jane Smith",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0005",
     "montant": 719.77,
     "devise": "GBP",
     "nom": "Charlie Davis",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0006",
     "montant": 648.78,
     "devise": "JPY",
     "nom": "Frank Green",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0007",
     "montant": 72.04,
     "devise": "JPY",
     "nom": "Eve White",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0008",
     "montant": 730.02,
     "devise": "GBP",
     "nom": "David Wilson",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0009",
     "montant": 899.88,
     "devise": "EUR",
     "nom": "Hannah Blue",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   },
   {
+    "id_externe": "FAKE-INV-0010",
     "montant": 450.61,
     "devise": "EUR",
     "nom": "Alice Johnson",
+    "partenaire": "La banque postale",
     "date": "2025-02-03"
   }
 ]
