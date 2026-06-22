@@ -21,4 +21,11 @@ class Invoice
 
     #[ORM\Column(type: 'string')]
     public string $currency;
+
+    #[ORM\Column(name: 'id_external', type: 'string', nullable: true)]
+    public ?string $idExternal = null;
+
+    #[ORM\ManyToOne(targetEntity: Partner::class)]
+    #[ORM\JoinColumn(name: 'partner_id', referencedColumnName: 'id', nullable: true)]
+    public ?Partner $partner = null;
 }
