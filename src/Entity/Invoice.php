@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Enum\Currency;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: 'App\Repository\InvoiceRepository')]
@@ -21,8 +22,8 @@ class Invoice
     #[ORM\Column(type: 'float')]
     public float $amount;
 
-    #[ORM\Column(type: 'string')]
-    public string $currency;
+    #[ORM\Column(type: 'string', enumType: Currency::class)]
+    public Currency $currency;
 
     #[ORM\Column(name: 'id_external', type: 'string', nullable: true)]
     public ?string $idExternal = null;

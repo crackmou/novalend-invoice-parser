@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Enum\Currency;
 use App\Repository\InvoiceRepository;
 
 
@@ -33,9 +34,11 @@ class InvoiceParser
 
         foreach ($invoices as $invoice) {
             $this->invoiceRepository->upsert(
+                (string) $invoice['id_externe'],
                 (string) $invoice['nom'],
                 (float) $invoice['montant'],
-                (string) $invoice['devise'],
+                Currency::from((string) $invoice['devise']),
+                (string) $invoice['partenaire'],
             );
         }
     }
@@ -47,12 +50,14 @@ class InvoiceParser
             file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
         );
 
-        // Colonnes du CSV : montant, devise, nom, date
+        // Colonnes du CSV : id_externe, montant, devise, nom, partenaire, date
         foreach ($rows as $row) {
             $this->invoiceRepository->upsert(
-                (string) $row[2],
-                (float) $row[0],
-                (string) $row[1],
+                (string) $row[0],
+                (string) $row[3],
+                (float) $row[1],
+                Currency::from((string) $row[2]),
+                (string) $row[4],
             );
         }
     }
