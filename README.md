@@ -65,7 +65,7 @@ Pour exécuter tous les tests dans le projet, tu peux utiliser :
 
 ### 3. Lancer le hook de pre-push
 
-Pour exécuter les vérifications du hook de pre-push (tests, lint, etc.), utilise la commande suivante :
+Pour exécuter les vérifications du hook de pre-push (cs-fixer, phpstan), utilise la commande suivante :
 
    ```bash
   docker-compose exec app ci/git/pre-push-hook

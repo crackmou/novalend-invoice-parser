@@ -44,8 +44,12 @@ class InvoiceParser
             throw new \RuntimeException(sprintf('Impossible de lire le fichier : "%s".', $filePath));
         }
         $invoices = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($invoices)) {
+            throw new \RuntimeException(sprintf('Le fichier JSON ne contient pas une liste de factures : "%s".', $filePath));
+        }
 
         $batch = [];
+        /** @var array<string, scalar> $invoice */
         foreach ($invoices as $invoice) {
             $batch[] = $this->getElement(
                 (string) $invoice['id_externe'],

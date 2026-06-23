@@ -5,12 +5,11 @@ NC='\033[0m' # No Color
 echo "${CYAN}----------------------"
 echo "Launching php-cs-fixer"
 echo "----------------------${NC}"
-#PHP_CS_FIXER_IGNORE_ENV=1 ./vendor/bin/php-cs-fixer fix src
 ./vendor/bin/php-cs-fixer fix src
 echo "${CYAN}----------------------"
 echo "Launching phpstan"
 echo "----------------------${NC}"
-./vendor/bin/phpstan analyse src/ --memory-limit=-1 --level 8
+./vendor/bin/phpstan analyse src/ --memory-limit=-1 --level max
 if [ $? -ne 0 ]; then
     echo "Fail phpstan. Please fix"
     exit 1
