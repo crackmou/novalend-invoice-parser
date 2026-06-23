@@ -2,12 +2,10 @@
 
 declare(strict_types=1);
 
-
 namespace App\Service;
 
 use App\Enum\Currency;
 use App\Repository\InvoiceRepository;
-
 
 class InvoiceParser
 {
@@ -16,6 +14,8 @@ class InvoiceParser
      * ne jamais garder l'intégralité du fichier en mémoire.
      */
     private const FLUSH_SIZE = 1000;
+    private const CSV_EXTENSION = 'csv';
+    private const JSON_EXTENSION = 'json';
 
     private InvoiceRepository $invoiceRepository;
 
@@ -26,11 +26,15 @@ class InvoiceParser
 
     public function parse(string $filePath): void
     {
-        if (str_contains($filePath, 'json')) {
-            $this->parseJson($filePath);
-        } elseif (str_contains($filePath, 'csv')) {
-            $this->parseCsv($filePath);
+        if (!file_exists($filePath)) {
+            throw new \Exception(sprintf('Fichier introuvable : "%s".', $filePath));
         }
+        $ext = pathinfo($filePath, PATHINFO_EXTENSION);
+        match ($ext) {
+            self::CSV_EXTENSION => $this->parseCSV($filePath),
+            self::JSON_EXTENSION => $this->parseJson($filePath),
+            default => throw new \Exception(sprintf('Extension de fichier non supportée : "%s".', $ext)),
+        };
     }
 
     private function parseJson(string $filePath): void
@@ -40,13 +44,13 @@ class InvoiceParser
 
         $batch = [];
         foreach ($invoices as $invoice) {
-            $batch[] = [
-                'idExternal' => (string) $invoice['id_externe'],
-                'name' => (string) $invoice['nom'],
-                'amount' => (float) $invoice['montant'],
-                'currency' => Currency::from((string) $invoice['devise']),
-                'partnerName' => (string) $invoice['partenaire'],
-            ];
+            $batch[] = $this->getElement(
+                (string) $invoice['id_externe'],
+                (string) $invoice['nom'],
+                (float) $invoice['montant'],
+                Currency::from((string) $invoice['devise']),
+                (string) $invoice['partenaire']
+            );
 
             if (count($batch) >= self::FLUSH_SIZE) {
                 $this->invoiceRepository->upsertBatch($batch);
@@ -54,7 +58,7 @@ class InvoiceParser
             }
         }
 
-        if ($batch !== []) {
+        if ([] !== $batch) {
             $this->invoiceRepository->upsertBatch($batch);
         }
     }
@@ -62,7 +66,7 @@ class InvoiceParser
     private function parseCsv(string $filePath): void
     {
         $handle = fopen($filePath, 'r');
-        if ($handle === false) {
+        if (false === $handle) {
             throw new \RuntimeException(sprintf('Impossible d\'ouvrir le fichier : "%s".', $filePath));
         }
 
@@ -72,29 +76,44 @@ class InvoiceParser
             // Colonnes du CSV : id_externe, montant, devise, nom, partenaire, date
             while (($row = fgetcsv($handle, 0, "\t", '"', '')) !== false) {
                 // Ignore les lignes vides éventuelles.
-                if ($row === [null] || $row === []) {
+                if ($row === [null] || [] === $row) {
                     continue;
                 }
 
-                $batch[] = [
-                    'idExternal' => (string) $row[0],
-                    'name' => (string) $row[3],
-                    'amount' => (float) $row[1],
-                    'currency' => Currency::from((string) $row[2]),
-                    'partnerName' => (string) $row[4],
-                ];
-
+                $batch[] = $this->getElement(
+                    (string) $row[0],
+                    (string) $row[3],
+                    (float) $row[1],
+                    Currency::from((string) $row[2]),
+                    (string) $row[4]
+                );
                 if (count($batch) >= self::FLUSH_SIZE) {
                     $this->invoiceRepository->upsertBatch($batch);
                     $batch = [];
                 }
             }
 
-            if ($batch !== []) {
+            if ([] !== $batch) {
                 $this->invoiceRepository->upsertBatch($batch);
             }
         } finally {
             fclose($handle);
         }
+    }
+
+    private function getElement(
+        string $idExternal,
+        string $name,
+        float $amount,
+        Currency $currency,
+        string $partnerName,
+    ): array {
+        return [
+            'idExternal' => $idExternal,
+            'name' => $name,
+            'amount' => $amount,
+            'currency' => $currency,
+            'partnerName' => $partnerName,
+        ];
     }
 }

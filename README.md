@@ -62,3 +62,11 @@ Pour exécuter tous les tests dans le projet, tu peux utiliser :
    ```bash
   docker-compose exec app php vendor/bin/phpunit
    ```
+
+### 3. Lancer le hook de pre-push
+
+Pour exécuter les vérifications du hook de pre-push (tests, lint, etc.), utilise la commande suivante :
+
+   ```bash
+  docker-compose exec app ci/git/pre-push-hook
+   ```

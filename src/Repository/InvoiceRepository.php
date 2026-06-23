@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 namespace App\Repository;
 
 use App\Entity\Invoice;
@@ -43,11 +42,11 @@ class InvoiceRepository extends ServiceEntityRepository
      *     partnerName: string
      * }> $invoices
      *
-     * @throws \RuntimeException si un partenaire référencé n'existe pas.
+     * @throws \RuntimeException si un partenaire référencé n'existe pas
      */
     public function upsertBatch(array $invoices): void
     {
-        if ($invoices === []) {
+        if ([] === $invoices) {
             return;
         }
 
@@ -95,7 +94,7 @@ class InvoiceRepository extends ServiceEntityRepository
      *
      * @return array<string, int> nom du partenaire => identifiant
      *
-     * @throws \RuntimeException si un partenaire référencé n'existe pas.
+     * @throws \RuntimeException si un partenaire référencé n'existe pas
      */
     private function resolvePartnerIds(array $invoices): array
     {
@@ -111,10 +110,8 @@ class InvoiceRepository extends ServiceEntityRepository
         }
 
         $unknown = array_diff($names, array_keys($partnerIds));
-        if ($unknown !== []) {
-            throw new \RuntimeException(
-                sprintf('Partenaire(s) inconnu(s) : "%s".', implode('", "', $unknown))
-            );
+        if ([] !== $unknown) {
+            throw new \RuntimeException(sprintf('Partenaire(s) inconnu(s) : "%s".', implode('", "', $unknown)));
         }
 
         return $partnerIds;

@@ -1,0 +1,9 @@
+[
+  {
+    "id_externe": "FAKE-INV-0001",
+    "montant": 670.43,
+    "devise": "EUR",
+    "partenaire": "La banque postale",
+    "date": "2025-02-03"
+  }
+]

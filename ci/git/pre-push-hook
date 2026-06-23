@@ -1,0 +1,20 @@
+#!/bin/sh
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+echo "${CYAN}----------------------"
+echo "Launching php-cs-fixer"
+echo "----------------------${NC}"
+#PHP_CS_FIXER_IGNORE_ENV=1 ./vendor/bin/php-cs-fixer fix src
+./vendor/bin/php-cs-fixer fix src
+echo "${CYAN}----------------------"
+echo "Launching phpstan"
+echo "----------------------${NC}"
+./vendor/bin/phpstan analyse src/ --memory-limit=-1 --level 3
+if [ $? -ne 0 ]; then
+    echo "Fail phpstan. Please fix"
+    exit 1
+fi
+echo "${GREEN}----------------------"
+echo "Yes, you can push now! Thanks for the other RD members !"
+echo "----------------------${NC}"
