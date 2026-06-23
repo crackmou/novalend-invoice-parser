@@ -40,6 +40,9 @@ class InvoiceParser
     private function parseJson(string $filePath): void
     {
         $content = file_get_contents($filePath);
+        if (false === $content) {
+            throw new \RuntimeException(sprintf('Impossible de lire le fichier : "%s".', $filePath));
+        }
         $invoices = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
 
         $batch = [];
@@ -76,7 +79,7 @@ class InvoiceParser
             // Colonnes du CSV : id_externe, montant, devise, nom, partenaire, date
             while (($row = fgetcsv($handle, 0, "\t", '"', '')) !== false) {
                 // Ignore les lignes vides éventuelles.
-                if ($row === [null] || [] === $row) {
+                if ($row === [null]) {
                     continue;
                 }
 
@@ -101,6 +104,9 @@ class InvoiceParser
         }
     }
 
+    /**
+     * @return array{idExternal: string, name: string, amount: float, currency: Currency, partnerName: string}
+     */
     private function getElement(
         string $idExternal,
         string $name,

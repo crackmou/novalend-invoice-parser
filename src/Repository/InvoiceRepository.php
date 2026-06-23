@@ -10,6 +10,9 @@ use App\Enum\Currency;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Invoice>
+ */
 class InvoiceRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -57,7 +60,7 @@ class InvoiceRepository extends ServiceEntityRepository
             $valuePlaceholders = [];
             $parameters = [];
 
-            foreach (array_values($chunk) as $i => $invoice) {
+            foreach ($chunk as $i => $invoice) {
                 $valuePlaceholders[] = sprintf(
                     "(nextval('invoice_id_seq'), :id_external_%1\$d, :name_%1\$d, :amount_%1\$d, :currency_%1\$d, :partner_id_%1\$d)",
                     $i

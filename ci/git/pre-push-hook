@@ -10,7 +10,7 @@ echo "----------------------${NC}"
 echo "${CYAN}----------------------"
 echo "Launching phpstan"
 echo "----------------------${NC}"
-./vendor/bin/phpstan analyse src/ --memory-limit=-1 --level 3
+./vendor/bin/phpstan analyse src/ --memory-limit=-1 --level 8
 if [ $? -ne 0 ]; then
     echo "Fail phpstan. Please fix"
     exit 1
