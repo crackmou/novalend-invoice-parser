@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\ParseInvoicesCommand;
+use App\Entity\Partner;
 use App\Reader\CsvInvoiceReader;
 use App\Reader\InvoiceReaderRegistry;
 use App\Reader\JsonInvoiceReader;
+use App\Repository\InvoiceRepository;
 use App\Repository\InvoiceWriterInterface;
+use App\Repository\PartnerRepository;
 use App\Service\InvoiceParser;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -44,52 +48,43 @@ final class ParseInvoicesCommandTest extends TestCase
 
     public function testWithoutOptionImportsEveryFile(): void
     {
-        $writer = $this->createMock(InvoiceWriterInterface::class);
-        // Les deux fichiers exploitables (csv + json) sont persistés ; le .txt échoue.
-        $writer->expects(self::exactly(2))->method('upsertBatch');
-
-        $tester = $this->runCommand($writer, []);
+        $tester = $this->runCommand([]);
 
         $tester->assertCommandIsSuccessful();
         $output = $tester->getDisplay();
         self::assertStringContainsString('invoices.csv', $output);
         self::assertStringContainsString('invoices.json', $output);
         self::assertStringContainsString('notes.txt', $output);
+        // Les deux fichiers exploitables sont importés ; le .txt échoue.
+        self::assertSame(2, substr_count($output, 'Import OK'));
         self::assertStringContainsString('Extension de fichier non supportée', $output);
     }
 
     public function testPathGlobFiltersFiles(): void
     {
-        $writer = $this->createMock(InvoiceWriterInterface::class);
-        $writer->expects(self::once())->method('upsertBatch');
-
-        $tester = $this->runCommand($writer, ['--path' => $this->dataDir.'/*.csv']);
+        $tester = $this->runCommand(['--path' => $this->dataDir.'/*.csv']);
 
         $tester->assertCommandIsSuccessful();
         $output = $tester->getDisplay();
         self::assertStringContainsString('invoices.csv', $output);
         self::assertStringNotContainsString('invoices.json', $output);
+        self::assertSame(1, substr_count($output, 'Import OK'));
     }
 
     public function testPathCanTargetASingleFile(): void
     {
-        $writer = $this->createMock(InvoiceWriterInterface::class);
-        $writer->expects(self::once())->method('upsertBatch');
-
-        $tester = $this->runCommand($writer, ['--path' => $this->dataDir.'/invoices.json']);
+        $tester = $this->runCommand(['--path' => $this->dataDir.'/invoices.json']);
 
         $tester->assertCommandIsSuccessful();
         $output = $tester->getDisplay();
         self::assertStringContainsString('invoices.json', $output);
         self::assertStringNotContainsString('invoices.csv', $output);
+        self::assertSame(1, substr_count($output, 'Import OK'));
     }
 
     public function testPathMatchingNothingWarns(): void
     {
-        $writer = $this->createMock(InvoiceWriterInterface::class);
-        $writer->expects(self::never())->method('upsertBatch');
-
-        $tester = $this->runCommand($writer, ['--path' => $this->dataDir.'/*.xml']);
+        $tester = $this->runCommand(['--path' => $this->dataDir.'/*.xml']);
 
         $tester->assertCommandIsSuccessful();
         self::assertStringContainsString('Aucun fichier à importer', $tester->getDisplay());
@@ -98,16 +93,43 @@ final class ParseInvoicesCommandTest extends TestCase
     /**
      * @param array<string, string> $input
      */
-    private function runCommand(InvoiceWriterInterface $writer, array $input): CommandTester
+    private function runCommand(array $input): CommandTester
     {
-        $registry = new InvoiceReaderRegistry([new CsvInvoiceReader(), new JsonInvoiceReader()]);
-        $parser = new InvoiceParser($registry, $writer);
         // projectDir = le parent de data/ pour ce test.
-        $command = new ParseInvoicesCommand($parser, \dirname($this->dataDir));
+        $command = new ParseInvoicesCommand($this->makeParser(), \dirname($this->dataDir));
 
         $tester = new CommandTester($command);
         $tester->execute($input);
 
         return $tester;
+    }
+
+    /**
+     * Parser réel câblé sur des dépendances mockées : le partenaire « Olinn »
+     * des fixtures est résolu et la persistance est neutralisée (pas de base).
+     */
+    private function makeParser(): InvoiceParser
+    {
+        $registry = new InvoiceReaderRegistry([new CsvInvoiceReader(), new JsonInvoiceReader()]);
+
+        $partner = new Partner();
+        $partner->name = 'Olinn';
+
+        $partnerRepository = $this->getMockBuilder(PartnerRepository::class)
+            ->disableOriginalConstructor()
+            ->addMethods(['findOneByName'])
+            ->getMock();
+        $partnerRepository->method('findOneByName')->willReturn($partner);
+
+        $invoiceRepository = $this->createMock(InvoiceRepository::class);
+        $invoiceRepository->method('findOneBy')->willReturn(null);
+
+        return new InvoiceParser(
+            $registry,
+            $this->createMock(InvoiceWriterInterface::class),
+            $this->createMock(EntityManagerInterface::class),
+            $partnerRepository,
+            $invoiceRepository,
+        );
     }
 }

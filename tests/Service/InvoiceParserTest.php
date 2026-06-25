@@ -5,61 +5,140 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Dto\InvoiceInput;
+use App\Entity\Invoice;
+use App\Entity\Partner;
 use App\Enum\Currency;
 use App\Reader\InvoiceReaderInterface;
 use App\Reader\InvoiceReaderRegistry;
+use App\Repository\InvoiceRepository;
 use App\Repository\InvoiceWriterInterface;
+use App\Repository\PartnerRepository;
 use App\Service\InvoiceParser;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 final class InvoiceParserTest extends TestCase
 {
-    public function testInvoicesAreUpsertedInBatches(): void
+    public function testEachInvoiceIsPersistedThenFlushedOnce(): void
     {
-        // 2 500 factures => lots attendus de 1000, 1000, 500.
-        $reader = $this->readerYielding(2500);
-        $registry = new InvoiceReaderRegistry([$reader]);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::exactly(3))->method('persist')->with(self::isInstanceOf(Invoice::class));
+        $em->expects(self::once())->method('flush');
 
-        $batchSizes = [];
-        $repository = $this->createMock(InvoiceWriterInterface::class);
-        $repository->expects(self::exactly(3))
-            ->method('upsertBatch')
-            ->willReturnCallback(static function (array $batch) use (&$batchSizes): void {
-                $batchSizes[] = \count($batch);
-            });
+        $parser = $this->makeParser(
+            $this->readerYielding(3),
+            $em,
+            $this->partnerRepositoryReturning($this->partner('Olinn')),
+            $this->invoiceRepositoryFinding(null),
+        );
 
-        // On vise un fichier réel pour passer le contrôle d'existence ;
-        // le reader factice ignore son contenu.
-        (new InvoiceParser($registry, $repository))->parse('data/invoices.csv');
-
-        self::assertSame([1000, 1000, 500], $batchSizes);
+        $parser->parse('data/invoices.csv');
     }
 
-    public function testNothingIsPersistedForAnEmptyFile(): void
+    public function testExistingInvoiceIsUpdatedInPlace(): void
     {
-        $registry = new InvoiceReaderRegistry([$this->readerYielding(0)]);
+        $existing = new Invoice();
+        $existing->name = 'Ancien nom';
+        $existing->amount = 1.0;
+        $existing->currency = Currency::JPY;
 
-        $repository = $this->createMock(InvoiceWriterInterface::class);
-        $repository->expects(self::never())->method('upsertBatch');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist')->with(self::identicalTo($existing));
+        $em->expects(self::once())->method('flush');
 
-        (new InvoiceParser($registry, $repository))->parse('data/invoices.csv');
+        $parser = $this->makeParser(
+            $this->readerYielding(1),
+            $em,
+            $this->partnerRepositoryReturning($this->partner('Olinn')),
+            $this->invoiceRepositoryFinding($existing),
+        );
+
+        $parser->parse('data/invoices.csv');
+
+        // L'entité existante est mise à jour, pas remplacée.
+        self::assertSame('Name', $existing->name);
+        self::assertSame(10.0, $existing->amount);
+        self::assertSame(Currency::EUR, $existing->currency);
+        self::assertSame('INV-0', $existing->idExternal);
+    }
+
+    public function testPartnerIsResolvedOncePerName(): void
+    {
+        $partnerRepository = $this->getMockBuilder(PartnerRepository::class)
+            ->disableOriginalConstructor()
+            ->addMethods(['findOneByName'])
+            ->getMock();
+        $partnerRepository->expects(self::once())
+            ->method('findOneByName')
+            ->with('Olinn')
+            ->willReturn($this->partner('Olinn'));
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::exactly(2))->method('persist');
+        $em->expects(self::once())->method('flush');
+
+        $parser = $this->makeParser(
+            $this->readerYielding(2),
+            $em,
+            $partnerRepository,
+            $this->invoiceRepositoryFinding(null),
+        );
+
+        $parser->parse('data/invoices.csv');
+    }
+
+    public function testUnknownPartnerThrows(): void
+    {
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        $parser = $this->makeParser(
+            $this->readerYielding(1),
+            $em,
+            $this->partnerRepositoryReturning(null),
+            $this->invoiceRepositoryFinding(null),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Partenaire introuvable');
+
+        $parser->parse('data/invoices.csv');
     }
 
     public function testMissingFileThrows(): void
     {
-        $registry = new InvoiceReaderRegistry([$this->readerYielding(0)]);
-        $repository = $this->createMock(InvoiceWriterInterface::class);
+        $parser = $this->makeParser(
+            $this->readerYielding(0),
+            $this->createMock(EntityManagerInterface::class),
+            $this->partnerRepositoryReturning(null),
+            $this->invoiceRepositoryFinding(null),
+        );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Fichier introuvable');
 
-        (new InvoiceParser($registry, $repository))->parse('data/does_not_exist.csv');
+        $parser->parse('data/does_not_exist.csv');
     }
 
-    private function readerYielding(int $count): InvoiceReaderInterface
+    private function makeParser(
+        InvoiceReaderInterface $reader,
+        EntityManagerInterface $em,
+        PartnerRepository $partnerRepository,
+        InvoiceRepository $invoiceRepository,
+    ): InvoiceParser {
+        return new InvoiceParser(
+            new InvoiceReaderRegistry([$reader]),
+            $this->createMock(InvoiceWriterInterface::class),
+            $em,
+            $partnerRepository,
+            $invoiceRepository,
+        );
+    }
+
+    private function readerYielding(int $count, string $partnerName = 'Olinn'): InvoiceReaderInterface
     {
-        return new class($count) implements InvoiceReaderInterface {
-            public function __construct(private readonly int $count)
+        return new class($count, $partnerName) implements InvoiceReaderInterface {
+            public function __construct(private readonly int $count, private readonly string $partnerName)
             {
             }
 
@@ -71,9 +150,36 @@ final class InvoiceParserTest extends TestCase
             public function read(string $filePath): iterable
             {
                 for ($i = 0; $i < $this->count; ++$i) {
-                    yield new InvoiceInput(sprintf('INV-%d', $i), 'Name', 10.0, Currency::EUR, 'Olinn');
+                    yield new InvoiceInput(sprintf('INV-%d', $i), 'Name', 10.0, Currency::EUR, $this->partnerName);
                 }
             }
         };
+    }
+
+    private function partner(string $name): Partner
+    {
+        $partner = new Partner();
+        $partner->name = $name;
+
+        return $partner;
+    }
+
+    private function partnerRepositoryReturning(?Partner $partner): PartnerRepository
+    {
+        $repository = $this->getMockBuilder(PartnerRepository::class)
+            ->disableOriginalConstructor()
+            ->addMethods(['findOneByName'])
+            ->getMock();
+        $repository->method('findOneByName')->willReturn($partner);
+
+        return $repository;
+    }
+
+    private function invoiceRepositoryFinding(?Invoice $invoice): InvoiceRepository
+    {
+        $repository = $this->createMock(InvoiceRepository::class);
+        $repository->method('findOneBy')->willReturn($invoice);
+
+        return $repository;
     }
 }

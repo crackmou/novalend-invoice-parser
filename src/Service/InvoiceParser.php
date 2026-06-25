@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Invoice;
 use App\Reader\InvoiceReaderRegistry;
+use App\Repository\InvoiceRepository;
 use App\Repository\InvoiceWriterInterface;
+use App\Repository\PartnerRepository;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Orchestre l'import : choisit le reader adapté au fichier, agrège les factures
@@ -25,11 +29,49 @@ final class InvoiceParser
     public function __construct(
         private readonly InvoiceReaderRegistry $readers,
         private readonly InvoiceWriterInterface $invoiceWriter,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly PartnerRepository $partnerRepository,
+        private readonly InvoiceRepository $invoiceRepository,
     ) {
     }
 
     public function parse(string $filePath): void
     {
+        if (!is_file($filePath)) {
+            throw new \RuntimeException(sprintf('Fichier introuvable : "%s".', $filePath));
+        }
+
+        $reader = $this->readers->readerFor($filePath);
+
+        $partners = [];
+        foreach ($reader->read($filePath) as $invoiceFile) {
+            if (!isset($partners[$invoiceFile->partnerName])) {
+                $partner = $this->partnerRepository->findOneByName($invoiceFile->partnerName);
+                if (null === $partner) {
+                    throw new \RuntimeException(sprintf('Partenaire introuvable : "%s".', $invoiceFile->partnerName));
+                }
+                $partners[$invoiceFile->partnerName] = $partner;
+            }
+            $partner = $partners[$invoiceFile->partnerName];
+            $invoice = $this->invoiceRepository->findOneBy([
+                'idExternal' => $invoiceFile->idExternal,
+                'partner' => $partner,
+            ]);
+            if (null === $invoice) {
+                $invoice = new Invoice();
+            }
+            $invoice->name = $invoiceFile->name;
+            $invoice->amount = $invoiceFile->amount;
+            $invoice->currency = $invoiceFile->currency;
+            $invoice->idExternal = $invoiceFile->idExternal;
+            $invoice->partner = $partner;
+            $this->entityManager->persist($invoice);
+        }
+        $this->entityManager->flush();
+    }
+    /*public function parseBatch(string $filePath): void
+    {
+        // I really want to keep it, but won't be use, for now
         if (!is_file($filePath)) {
             throw new \RuntimeException(sprintf('Fichier introuvable : "%s".', $filePath));
         }
@@ -49,5 +91,6 @@ final class InvoiceParser
         if ([] !== $batch) {
             $this->invoiceWriter->upsertBatch($batch);
         }
-    }
+    }*/
+
 }
