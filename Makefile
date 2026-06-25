@@ -1,12 +1,12 @@
-.PHONY: parse help coverage coverage-check
+.PHONY: parse parse_with_path help coverage coverage-check
 
 # Seuil minimal de couverture de lignes (surchargeable : make coverage-check COVERAGE_MIN=70)
-COVERAGE_MIN ?= 75
+COVERAGE_MIN ?= 90
 
 help: ## Affiche les cibles disponibles
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-parse: ## Parse les factures (data/*) via app:parse
+parse: ## Parse tous les fichiers de data/ via app:parse
 	docker-compose run --rm app php -d memory_limit=1024M bin/console app:parse
 
 coverage: ## Génère le rapport de couverture (texte + HTML dans var/coverage)
