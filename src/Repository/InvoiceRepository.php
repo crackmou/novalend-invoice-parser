@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Dto\InvoiceInput;
 use App\Entity\Invoice;
 use App\Entity\Partner;
-use App\Enum\Currency;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
  * @extends ServiceEntityRepository<Invoice>
  */
-class InvoiceRepository extends ServiceEntityRepository
+class InvoiceRepository extends ServiceEntityRepository implements InvoiceWriterInterface
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -33,17 +33,7 @@ class InvoiceRepository extends ServiceEntityRepository
      * ou les met à jour si elles existent déjà pour le même couple
      * (id externe, partenaire).
      *
-     * Chaque entrée du tableau doit contenir les clés :
-     *   idExternal (string), name (string), amount (float),
-     *   currency (Currency), partnerName (string).
-     *
-     * @param array<int, array{
-     *     idExternal: string,
-     *     name: string,
-     *     amount: float,
-     *     currency: Currency,
-     *     partnerName: string
-     * }> $invoices
+     * @param array<int, InvoiceInput> $invoices
      *
      * @throws \RuntimeException si un partenaire référencé n'existe pas
      */
@@ -66,11 +56,11 @@ class InvoiceRepository extends ServiceEntityRepository
                     $i
                 );
 
-                $parameters["id_external_$i"] = $invoice['idExternal'];
-                $parameters["name_$i"] = $invoice['name'];
-                $parameters["amount_$i"] = $invoice['amount'];
-                $parameters["currency_$i"] = $invoice['currency']->value;
-                $parameters["partner_id_$i"] = $partnerIds[$invoice['partnerName']];
+                $parameters["id_external_$i"] = $invoice->idExternal;
+                $parameters["name_$i"] = $invoice->name;
+                $parameters["amount_$i"] = $invoice->amount;
+                $parameters["currency_$i"] = $invoice->currency->value;
+                $parameters["partner_id_$i"] = $partnerIds[$invoice->partnerName];
             }
 
             $sql = sprintf(
@@ -93,7 +83,7 @@ class InvoiceRepository extends ServiceEntityRepository
      * Résout en une seule requête l'identifiant de chaque partenaire référencé
      * par le lot, indexé par nom.
      *
-     * @param array<int, array{partnerName: string}> $invoices
+     * @param array<int, InvoiceInput> $invoices
      *
      * @return array<string, int> nom du partenaire => identifiant
      *
@@ -101,7 +91,10 @@ class InvoiceRepository extends ServiceEntityRepository
      */
     private function resolvePartnerIds(array $invoices): array
     {
-        $names = array_values(array_unique(array_column($invoices, 'partnerName')));
+        $names = array_values(array_unique(array_map(
+            static fn (InvoiceInput $invoice): string => $invoice->partnerName,
+            $invoices,
+        )));
 
         $partners = $this->getEntityManager()
             ->getRepository(Partner::class)

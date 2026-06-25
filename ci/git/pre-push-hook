@@ -2,6 +2,7 @@
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+COVERAGE_MIN=75
 echo "${CYAN}----------------------"
 echo "Launching php-cs-fixer"
 echo "----------------------${NC}"
@@ -12,6 +13,19 @@ echo "----------------------${NC}"
 ./vendor/bin/phpstan analyse src/ --memory-limit=-1 --level max
 if [ $? -ne 0 ]; then
     echo "Fail phpstan. Please fix"
+    exit 1
+fi
+echo "${CYAN}----------------------"
+echo "Launching tests + coverage (min ${COVERAGE_MIN}%)"
+echo "----------------------${NC}"
+./vendor/bin/phpunit --coverage-clover var/coverage/clover.xml
+if [ $? -ne 0 ]; then
+    echo "Fail tests. Please fix"
+    exit 1
+fi
+php ci/coverage-check.php var/coverage/clover.xml "${COVERAGE_MIN}"
+if [ $? -ne 0 ]; then
+    echo "Fail coverage. Please add tests"
     exit 1
 fi
 echo "${GREEN}----------------------"

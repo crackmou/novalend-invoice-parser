@@ -3,11 +3,16 @@ services:
     build: .
     image: php:8.2-fpm
     container_name: symfony_app
+    # Tourne avec l'UID/GID de l'hôte (défaut 1000) afin que les fichiers générés
+    # (var/cache, var/log, .phpunit.result.cache, ...) restent éditables côté hôte.
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - .:/var/www/html
     working_dir: /var/www/html
     environment:
       - SYMFONY_ENV=dev
+      - COMPOSER_HOME=/tmp/composer
+      - HOME=/tmp
     networks:
       - symfony_network
     depends_on:

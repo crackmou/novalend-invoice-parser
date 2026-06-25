@@ -4,126 +4,50 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Enum\Currency;
-use App\Repository\InvoiceRepository;
+use App\Reader\InvoiceReaderRegistry;
+use App\Repository\InvoiceWriterInterface;
 
-class InvoiceParser
+/**
+ * Orchestre l'import : choisit le reader adapté au fichier, agrège les factures
+ * par lots et délègue la persistance au repository.
+ *
+ * Cette classe ne connaît plus aucun format de fichier ni aucune règle de
+ * mapping : tout cela vit dans les readers et le DTO.
+ */
+final class InvoiceParser
 {
     /**
-     * Nombre de factures accumulées avant d'envoyer un lot au repository, afin de
-     * ne jamais garder l'intégralité du fichier en mémoire.
+     * Nombre de factures accumulées avant d'envoyer un lot au repository, afin
+     * de ne jamais garder l'intégralité du fichier en mémoire.
      */
     private const FLUSH_SIZE = 1000;
-    private const CSV_EXTENSION = 'csv';
-    private const JSON_EXTENSION = 'json';
 
-    private InvoiceRepository $invoiceRepository;
-
-    public function __construct(InvoiceRepository $invoiceRepository)
-    {
-        $this->invoiceRepository = $invoiceRepository;
+    public function __construct(
+        private readonly InvoiceReaderRegistry $readers,
+        private readonly InvoiceWriterInterface $invoiceWriter,
+    ) {
     }
 
     public function parse(string $filePath): void
     {
-        if (!file_exists($filePath)) {
-            throw new \Exception(sprintf('Fichier introuvable : "%s".', $filePath));
+        if (!is_file($filePath)) {
+            throw new \RuntimeException(sprintf('Fichier introuvable : "%s".', $filePath));
         }
-        $ext = pathinfo($filePath, PATHINFO_EXTENSION);
-        match ($ext) {
-            self::CSV_EXTENSION => $this->parseCSV($filePath),
-            self::JSON_EXTENSION => $this->parseJson($filePath),
-            default => throw new \Exception(sprintf('Extension de fichier non supportée : "%s".', $ext)),
-        };
-    }
 
-    private function parseJson(string $filePath): void
-    {
-        $content = file_get_contents($filePath);
-        if (false === $content) {
-            throw new \RuntimeException(sprintf('Impossible de lire le fichier : "%s".', $filePath));
-        }
-        $invoices = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($invoices)) {
-            throw new \RuntimeException(sprintf('Le fichier JSON ne contient pas une liste de factures : "%s".', $filePath));
-        }
+        $reader = $this->readers->readerFor($filePath);
 
         $batch = [];
-        /** @var array<string, scalar> $invoice */
-        foreach ($invoices as $invoice) {
-            $batch[] = $this->getElement(
-                (string) $invoice['id_externe'],
-                (string) $invoice['nom'],
-                (float) $invoice['montant'],
-                Currency::from((string) $invoice['devise']),
-                (string) $invoice['partenaire']
-            );
+        foreach ($reader->read($filePath) as $invoice) {
+            $batch[] = $invoice;
 
-            if (count($batch) >= self::FLUSH_SIZE) {
-                $this->invoiceRepository->upsertBatch($batch);
+            if (\count($batch) >= self::FLUSH_SIZE) {
+                $this->invoiceWriter->upsertBatch($batch);
                 $batch = [];
             }
         }
 
         if ([] !== $batch) {
-            $this->invoiceRepository->upsertBatch($batch);
+            $this->invoiceWriter->upsertBatch($batch);
         }
-    }
-
-    private function parseCsv(string $filePath): void
-    {
-        $handle = fopen($filePath, 'r');
-        if (false === $handle) {
-            throw new \RuntimeException(sprintf('Impossible d\'ouvrir le fichier : "%s".', $filePath));
-        }
-
-        try {
-            $batch = [];
-
-            // Colonnes du CSV : id_externe, montant, devise, nom, partenaire, date
-            while (($row = fgetcsv($handle, 0, "\t", '"', '')) !== false) {
-                // Ignore les lignes vides éventuelles.
-                if ($row === [null]) {
-                    continue;
-                }
-
-                $batch[] = $this->getElement(
-                    (string) $row[0],
-                    (string) $row[3],
-                    (float) $row[1],
-                    Currency::from((string) $row[2]),
-                    (string) $row[4]
-                );
-                if (count($batch) >= self::FLUSH_SIZE) {
-                    $this->invoiceRepository->upsertBatch($batch);
-                    $batch = [];
-                }
-            }
-
-            if ([] !== $batch) {
-                $this->invoiceRepository->upsertBatch($batch);
-            }
-        } finally {
-            fclose($handle);
-        }
-    }
-
-    /**
-     * @return array{idExternal: string, name: string, amount: float, currency: Currency, partnerName: string}
-     */
-    private function getElement(
-        string $idExternal,
-        string $name,
-        float $amount,
-        Currency $currency,
-        string $partnerName,
-    ): array {
-        return [
-            'idExternal' => $idExternal,
-            'name' => $name,
-            'amount' => $amount,
-            'currency' => $currency,
-            'partnerName' => $partnerName,
-        ];
     }
 }

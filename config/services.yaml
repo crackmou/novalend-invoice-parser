@@ -11,6 +11,11 @@ services:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
 
+    # Tout reader de factures est automatiquement taggé.
+    _instanceof:
+        App\Reader\InvoiceReaderInterface:
+            tags: ['app.invoice_reader']
+
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
     App\:
@@ -23,3 +28,12 @@ services:
     App\Command\:
         resource: '../src/Command'
         tags: ['console.command']
+
+    # Défini après le chargement par ressource ci-dessus afin de surcharger
+    # l'autowiring : l'ensemble des readers taggés est injecté dans le registre.
+    App\Reader\InvoiceReaderRegistry:
+        arguments:
+            $readers: !tagged_iterator app.invoice_reader
+
+    # Le contrat d'écriture pointe sur l'implémentation Doctrine.
+    App\Repository\InvoiceWriterInterface: '@App\Repository\InvoiceRepository'
