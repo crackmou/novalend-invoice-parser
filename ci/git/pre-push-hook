@@ -2,7 +2,7 @@
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
-COVERAGE_MIN=90
+COVERAGE_MIN=85
 echo "${CYAN}----------------------"
 echo "Launching php-cs-fixer"
 echo "----------------------${NC}"

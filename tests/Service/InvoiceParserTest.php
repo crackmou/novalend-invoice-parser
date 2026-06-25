@@ -11,7 +11,6 @@ use App\Enum\Currency;
 use App\Reader\InvoiceReaderInterface;
 use App\Reader\InvoiceReaderRegistry;
 use App\Repository\InvoiceRepository;
-use App\Repository\InvoiceWriterInterface;
 use App\Repository\PartnerRepository;
 use App\Service\InvoiceParser;
 use Doctrine\ORM\EntityManagerInterface;
@@ -128,7 +127,6 @@ final class InvoiceParserTest extends TestCase
     ): InvoiceParser {
         return new InvoiceParser(
             new InvoiceReaderRegistry([$reader]),
-            $this->createMock(InvoiceWriterInterface::class),
             $em,
             $partnerRepository,
             $invoiceRepository,

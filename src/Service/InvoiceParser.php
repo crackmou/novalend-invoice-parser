@@ -7,7 +7,6 @@ namespace App\Service;
 use App\Entity\Invoice;
 use App\Reader\InvoiceReaderRegistry;
 use App\Repository\InvoiceRepository;
-use App\Repository\InvoiceWriterInterface;
 use App\Repository\PartnerRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -28,7 +27,6 @@ final class InvoiceParser
 
     public function __construct(
         private readonly InvoiceReaderRegistry $readers,
-        private readonly InvoiceWriterInterface $invoiceWriter,
         private readonly EntityManagerInterface $entityManager,
         private readonly PartnerRepository $partnerRepository,
         private readonly InvoiceRepository $invoiceRepository,
@@ -69,28 +67,4 @@ final class InvoiceParser
         }
         $this->entityManager->flush();
     }
-    /*public function parseBatch(string $filePath): void
-    {
-        // I really want to keep it, but won't be use, for now
-        if (!is_file($filePath)) {
-            throw new \RuntimeException(sprintf('Fichier introuvable : "%s".', $filePath));
-        }
-
-        $reader = $this->readers->readerFor($filePath);
-
-        $batch = [];
-        foreach ($reader->read($filePath) as $invoice) {
-            $batch[] = $invoice;
-
-            if (\count($batch) >= self::FLUSH_SIZE) {
-                $this->invoiceWriter->upsertBatch($batch);
-                $batch = [];
-            }
-        }
-
-        if ([] !== $batch) {
-            $this->invoiceWriter->upsertBatch($batch);
-        }
-    }*/
-
 }

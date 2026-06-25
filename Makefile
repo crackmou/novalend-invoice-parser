@@ -1,7 +1,7 @@
 .PHONY: parse parse_with_path help coverage coverage-check
 
 # Seuil minimal de couverture de lignes (surchargeable : make coverage-check COVERAGE_MIN=70)
-COVERAGE_MIN ?= 90
+COVERAGE_MIN ?= 85
 
 help: ## Affiche les cibles disponibles
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'

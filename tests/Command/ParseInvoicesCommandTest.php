@@ -10,7 +10,6 @@ use App\Reader\CsvInvoiceReader;
 use App\Reader\InvoiceReaderRegistry;
 use App\Reader\JsonInvoiceReader;
 use App\Repository\InvoiceRepository;
-use App\Repository\InvoiceWriterInterface;
 use App\Repository\PartnerRepository;
 use App\Service\InvoiceParser;
 use Doctrine\ORM\EntityManagerInterface;
@@ -126,7 +125,6 @@ final class ParseInvoicesCommandTest extends TestCase
 
         return new InvoiceParser(
             $registry,
-            $this->createMock(InvoiceWriterInterface::class),
             $this->createMock(EntityManagerInterface::class),
             $partnerRepository,
             $invoiceRepository,
